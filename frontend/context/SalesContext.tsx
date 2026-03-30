@@ -9,6 +9,7 @@ import { useAuth } from './AuthContext';
 import { bomService } from '../services/bomService';
 import { transactionService } from '../services/transactionService';
 import { examinationBatchService } from '../services/examinationBatchService';
+import { jobTicketConversionService } from '../services/jobTicketConversionService';
 import { addDays, addMonths, addYears, isBefore, parseISO, format, isSameDay } from 'date-fns';
 
 import { customerNotificationService, type NotificationActivityType } from '../services/customerNotificationService';
@@ -89,6 +90,7 @@ interface SalesContextType {
     deleteQuotation: (id: string, reason?: string) => void;
     createQuoteRevision: (originalId: string) => void;
     convertQuotationToWorkOrder: (quotation: Quotation) => Promise<string>;
+    convertQuotationToJobTicket: (quotation: Quotation) => Promise<string>;
     convertQuotationToInvoice: (quotation: Quotation) => Promise<string>;
 
     addJobOrder: (jobOrder: JobOrder) => void;
@@ -664,6 +666,22 @@ export const SalesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
     };
 
+    const convertQuotationToJobTicket = async (q: Quotation): Promise<string> => {
+        try {
+            const result = await jobTicketConversionService.convertQuotationToJobTicket(q.id, {
+                requestedBy: user?.username || user?.id || 'system',
+                requesterRole: user?.role || 'System'
+            });
+            await salesStore.fetchSalesData();
+            await productionStore.fetchProductionData();
+            notify(`Quotation ${q.id} converted to Job Ticket ${result.jobTicketId}`, "success");
+            return result.jobTicketId;
+        } catch (err: any) {
+            notify(`Conversion Failed: ${err.message}`, "error");
+            throw err;
+        }
+    };
+
     const convertQuotationToInvoice = async (q: Quotation): Promise<string> => {
         const invId = generateNextId('invoice', finance.invoices, companyConfig);
         const resolvedCustomerId = resolveCustomerId(q.customerId, q.customerName);
@@ -1138,6 +1156,7 @@ export const SalesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 }
             },
             convertQuotationToWorkOrder,
+            convertQuotationToJobTicket,
             convertQuotationToInvoice,
             convertJobOrderToInvoice,
             updateCustomerPayment, deleteCustomerPayment,

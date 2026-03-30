@@ -21,6 +21,7 @@ import { dbService } from '../services/db';
 import { ExaminationInvoiceSyncResult, persistExaminationInvoiceToFinance } from '../services/examinationInvoiceSyncService';
 import { examinationNotificationService } from '../services/examinationNotificationService';
 import { examinationSyncService } from '../services/examinationSyncService';
+import { jobTicketConversionService } from '../services/jobTicketConversionService';
 import {
   sendBatchApprovedNotification,
   sendBatchCalculatedNotification,
@@ -59,6 +60,7 @@ interface ExaminationContextType {
     invoice?: ExaminationGeneratedInvoicePayload;
     sync?: ExaminationInvoiceSyncResult;
   }>;
+  convertBatchToJobTicket: (id: string) => Promise<string>;
 
   // Loading states
   loading: boolean;
@@ -123,7 +125,7 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promis
 };
 
 export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ children }) => {
-  const { companyConfig, user } = useAuth();
+  const { companyConfig, user, notify } = useAuth();
   const [jobs, setJobs] = useState<ExaminationJob[]>([]);
   const [subjects, setSubjects] = useState<ExaminationJobSubject[]>([]);
   const [groups, setGroups] = useState<ExaminationInvoiceGroup[]>([]);
@@ -820,6 +822,23 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
     calculateBatch,
     approveBatch,
     generateInvoice,
+    convertBatchToJobTicket: async (id: string) => {
+      setLoading(true);
+      try {
+        const result = await jobTicketConversionService.convertExaminationBatchToJobTicket(id, {
+          requestedBy: user?.username || user?.id || 'system',
+          requesterRole: user?.role || 'System'
+        });
+        await loadBatches();
+        notify(`Batch ${id} converted to Job Ticket ${result.jobTicketId}`, 'success');
+        return result.jobTicketId;
+      } catch (error: any) {
+        notify(`Conversion Failed: ${error.message}`, 'error');
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
 
     createJob,
     updateJob,

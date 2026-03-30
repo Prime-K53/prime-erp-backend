@@ -702,6 +702,26 @@ const ExaminationBatchDetail: React.FC = () => {
             </button>
           )}
 
+          {(batch.status === 'Approved' || batch.status === 'Invoiced') && (
+            <button
+              type="button"
+              onClick={async () => {
+                if (window.confirm('Convert this batch to a Job Ticket for production?')) {
+                  try {
+                    const ticketId = await (useExamination as any)().convertBatchToJobTicket(batch.id);
+                    navigate('/sales-flow/job-tickets');
+                  } catch (err) {
+                    // Error handled in context
+                  }
+                }
+              }}
+              className={`${primaryButtonClass} bg-rose-600 hover:bg-rose-700`}
+            >
+              <Printer size={14} />
+              Convert to Job Ticket
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setIsAddClassOpen(true)}

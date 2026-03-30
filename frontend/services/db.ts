@@ -148,9 +148,36 @@ let saveTimer: any = null;
 let isSaving = false;
 type SyncStatus = 'idle' | 'connected' | 'syncing' | 'error' | 'restricted';
 let onSyncStateChange: ((status: SyncStatus) => void) | null = null;
+const DATA_CHANGED_EVENT = 'primeerp:data-changed';
+const DATA_CHANGED_CHANNEL = 'primeerp-data-sync';
+const DB_SOURCE = `db-${Math.random().toString(36).slice(2)}`;
+let dataChangeChannel: BroadcastChannel | null = null;
 
 const notifySyncState = (status: SyncStatus) => {
     if (onSyncStateChange) onSyncStateChange(status);
+};
+
+const emitDataChange = (stores: string[]) => {
+    const payload = {
+        type: 'data-changed',
+        stores,
+        source: DB_SOURCE,
+        at: Date.now()
+    };
+    try {
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT, { detail: payload }));
+            localStorage.setItem(DATA_CHANGED_EVENT, JSON.stringify(payload));
+        }
+    } catch { }
+    try {
+        if (typeof BroadcastChannel !== 'undefined') {
+            if (!dataChangeChannel) {
+                dataChangeChannel = new BroadcastChannel(DATA_CHANGED_CHANNEL);
+            }
+            dataChangeChannel.postMessage(payload);
+        }
+    } catch { }
 };
 
 const STORE_NAMES: (keyof NexusDB)[] = [
@@ -431,6 +458,7 @@ export const dbService = {
         try {
             const result = await operation(tx);
             await tx.done;
+            emitDataChange(stores.map((store) => String(store)));
             return result;
         } catch (err) {
             console.error("Atomic transaction failed. Data rolled back locally.", err);
@@ -518,6 +546,7 @@ export const dbService = {
         }
         const res = await db.put(storeName as any, item as any);
         this.triggerSync();
+        emitDataChange([String(storeName)]);
         return res as string;
     },
 
@@ -536,6 +565,7 @@ export const dbService = {
         const db = await initDB();
         await db.put('settings', { id: key, ...value as any });
         this.triggerSync();
+        emitDataChange(['settings']);
     },
 
     async factoryReset() {
@@ -550,6 +580,7 @@ export const dbService = {
         const db = await initDB();
         await db.delete(storeName as any, id);
         this.triggerSync();
+        emitDataChange([String(storeName)]);
     },
 
     async saveFile(file: File): Promise<string> {

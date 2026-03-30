@@ -683,6 +683,11 @@ const Orders: React.FC = () => {
                 notify(`Quote ${item.id} successfully released as Work Order ${woId}`, "success");
                 navigate('/production/work-orders');
             }
+            if (action === 'convert_to_job_ticket') {
+                const ticketId = await (useSales as any)().convertQuotationToJobTicket(item);
+                notify(`Quote ${item.id} successfully converted to Job Ticket ${ticketId}`, "success");
+                navigate('/sales-flow/job-tickets');
+            }
             if (action === 'email_now') openEmailModal(item, 'Quotation', false);
             if (action === 'duplicate_exact') {
                 const baseData = {

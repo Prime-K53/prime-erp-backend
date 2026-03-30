@@ -283,6 +283,14 @@ export const QuotationDetails: React.FC<QuotationDetailsProps> = ({ quotation: i
                   >
                     <Briefcase size={18} /> Convert to Work Order
                   </button>
+
+                  <button
+                    onClick={() => onAction(quotation, 'convert_to_job_ticket')}
+                    disabled={isConverted}
+                    className="w-full px-4 py-3 bg-rose-50 text-rose-700 border border-rose-100 rounded-2xl text-[13px] font-bold tracking-tight hover:bg-rose-100 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <Printer size={18} /> Convert to Job Ticket
+                  </button>
                 </div>
 
                 <div className="bg-rose-50 p-6 rounded-3xl border border-rose-100 space-y-3">
