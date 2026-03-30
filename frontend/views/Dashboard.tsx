@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, ReferenceLine
+  PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, ReferenceLine, Cursor
 } from 'recharts';
 import { subWeeks, subMonths, subYears, isAfter, format } from 'date-fns';
 import {
@@ -27,6 +27,184 @@ import { DashboardSkeleton } from '../components/Skeleton';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ExaminationBatchNotificationCard } from '../components/ExaminationBatchNotificationCard';
 import { ExaminationBatchNotificationCardCompact } from '../components/ExaminationBatchNotificationCardCompact';
+
+// Recurring Invoices Card Component with Fixed Dimensions and Auto-Slide
+const RecurringInvoicesCard: React.FC<{ recurringInvoices: any[], currency: string, navigate: any }> = ({ recurringInvoices, currency, navigate }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // Auto-slide every 4 seconds
+  useEffect(() => {
+    if (recurringInvoices.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setIsAnimating(true);
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % recurringInvoices.length);
+        setIsAnimating(false);
+      }, 300);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [recurringInvoices.length]);
+
+  // Manual navigation
+  const goToSlide = (index: number) => {
+    if (index === currentIndex || recurringInvoices.length <= 1) return;
+    setIsAnimating(true);
+    setTimeout(() => {
+      setCurrentIndex(index);
+      setIsAnimating(false);
+    }, 300);
+  };
+
+  if (!recurringInvoices || recurringInvoices.length === 0) {
+    return (
+      <div className="bg-white rounded-[1.5rem] shadow-soft border border-white p-6 h-[350px] flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-[#1E293B]">Recurring Invoices</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Automated billing • Active</p>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <RefreshCw size={24} className="text-slate-400" />
+            </div>
+            <p className="text-sm text-slate-500 font-medium">No recurring invoices</p>
+            <p className="text-xs text-slate-400 mt-1">Set up automated billing</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const currentInvoice = recurringInvoices[currentIndex];
+
+  return (
+    <div className="bg-white rounded-[1.5rem] shadow-soft border border-white p-6 h-[350px] flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-base font-bold text-[#1E293B]">Recurring Invoices</h3>
+          <p className="text-xs text-slate-400 mt-0.5">Automated billing • Active</p>
+        </div>
+        <button
+          onClick={() => navigate('/sales-flow/recurring-invoices')}
+          className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-1"
+        >
+          Manage <ChevronRight size={14} />
+        </button>
+      </div>
+
+      {/* Slide Container with Fixed Height */}
+      <div className="flex-1 relative overflow-hidden">
+        <div
+          className={`transition-all duration-300 ease-in-out transform ${
+            isAnimating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+          }`}
+        >
+          {/* Invoice Content */}
+          <div className="h-full flex flex-col">
+            {/* Customer Info */}
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-[#1E293B] truncate">
+                {currentInvoice.customerName || 'Unknown Customer'}
+              </h4>
+              <p className="text-xs text-slate-500 mt-1">
+                {currentInvoice.description || 'Recurring service'}
+              </p>
+            </div>
+
+            {/* Amount and Frequency */}
+            <div className="flex-1 flex flex-col justify-center">
+              <div className="text-center mb-4">
+                <div className="text-2xl font-bold text-[#1E293B]">
+                  {currency}{(currentInvoice.totalAmount || currentInvoice.amount || 0).toLocaleString()}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {currentInvoice.frequency || 'Monthly'} • {currentInvoice.interval || '30'} days
+                </div>
+              </div>
+
+              {/* Next Due Date */}
+              <div className="bg-blue-50 rounded-lg p-3 mb-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-blue-600 font-medium">Next Due</span>
+                  <span className="text-xs font-bold text-blue-700">
+                    {currentInvoice.nextDueDate ? 
+                      new Date(currentInvoice.nextDueDate).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: 'numeric'
+                      }) : 
+                      'Not set'
+                    }
+                  </span>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="flex justify-center">
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                  currentInvoice.status === 'Active' 
+                    ? 'bg-green-100 text-green-700' 
+                    : currentInvoice.status === 'Paused'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-slate-100 text-slate-700'
+                }`}>
+                  <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                    currentInvoice.status === 'Active' 
+                      ? 'bg-green-500' 
+                      : currentInvoice.status === 'Paused'
+                      ? 'bg-amber-500'
+                      : 'bg-slate-500'
+                  }`}></div>
+                  {currentInvoice.status || 'Unknown'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Slide Indicators */}
+      {recurringInvoices.length > 1 && (
+        <div className="flex justify-center items-center gap-1.5 mt-4">
+          {recurringInvoices.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`transition-all duration-300 ease-out ${
+                index === currentIndex
+                  ? 'w-8 h-2 bg-blue-600 rounded-full shadow-sm'
+                  : 'w-2 h-2 bg-slate-300 rounded-full hover:bg-slate-400'
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
+        <button
+          onClick={() => navigate(`/sales-flow/recurring-invoices?action=edit&id=${currentInvoice.id}`)}
+          className="flex-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 py-2 px-3 rounded-lg transition-colors"
+        >
+          Edit
+        </button>
+        <button
+          onClick={() => navigate(`/sales-flow/recurring-invoices?action=pause&id=${currentInvoice.id}`)}
+          className="flex-1 text-xs font-medium text-slate-600 hover:text-slate-700 hover:bg-slate-50 py-2 px-3 rounded-lg transition-colors"
+        >
+          {currentInvoice.status === 'Active' ? 'Pause' : 'Resume'}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const Dashboard: React.FC = () => {
   const {
@@ -118,15 +296,12 @@ const Dashboard: React.FC = () => {
     return val.toLocaleString(undefined, { maximumFractionDigits: 0 });
   };
 
-  const [searchQuery, setSearchTerm] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [quickTaskTitle, setQuickTaskTitle] = useState<string>('');
   const [examinationQueue, setExaminationQueue] = useState<any[]>([]);
-  const [invoiceTimePeriod, setInvoiceTimePeriod] = useState<string>('Last week');
-  const [posTimePeriod, setPosTimePeriod] = useState<string>('Last week');
-  const [activeSubscriptionIndex, setActiveSubscriptionIndex] = useState(0);
 
   // Sub-account filtering state
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all');
@@ -216,15 +391,6 @@ const Dashboard: React.FC = () => {
     fetchExaminationQueue();
   }, []);
 
-  // Auto-rotate subscriptions carousel
-  useEffect(() => {
-    if (filteredRecurringInvoices.length <= 1) return;
-    const interval = setInterval(() => {
-      setActiveSubscriptionIndex(prev => (prev + 1) % filteredRecurringInvoices.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [filteredRecurringInvoices.length]);
-
   const handleAddQuickTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickTaskTitle.trim()) return;
@@ -266,163 +432,6 @@ const Dashboard: React.FC = () => {
       expenses: expenses || []
     })
   ), [accounts, filteredLedger, filteredInvoices, filteredSales, customerPayments, purchases, expenses]);
-
-  const getMonthlyRevenue = useCallback((month: number, year: number) => (
-    financialIntegrityService.buildVerifiedDashboardMetrics({
-      accounts: accounts || [],
-      ledger: filteredLedger || [],
-      invoices: filteredInvoices || [],
-      sales: filteredSales || [],
-      customerPayments: customerPayments || [],
-      purchases: purchases || [],
-      expenses: expenses || []
-    }, new Date(year, month, 1)).currentMonth.revenue
-  ), [accounts, filteredLedger, filteredInvoices, filteredSales, customerPayments, purchases, expenses]);
-
-  const getMonthlyExpenses = useCallback((month: number, year: number) => (
-    financialIntegrityService.buildVerifiedDashboardMetrics({
-      accounts: accounts || [],
-      ledger: filteredLedger || [],
-      invoices: filteredInvoices || [],
-      sales: filteredSales || [],
-      customerPayments: customerPayments || [],
-      purchases: purchases || [],
-      expenses: expenses || []
-    }, new Date(year, month, 1)).currentMonth.expenses
-  ), [accounts, filteredLedger, filteredInvoices, filteredSales, customerPayments, purchases, expenses]);
-
-  const getMonthlyExpenditure = useCallback((month: number, year: number) => {
-    // Expenditure typically means Cash Outflow + Accrued Expenses.
-    // For "Financial Performance", it usually compares Income (Revenue) vs Expenses (Accrual).
-    // So we should return Total Expenses (including COGS) for the month.
-    return getMonthlyExpenses(month, year);
-  }, [getMonthlyExpenses]);
-
-  const kpiData = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    const curRev = verifiedDashboardMetrics.currentMonth.revenue;
-    const prevRev = verifiedDashboardMetrics.previousMonth.revenue;
-    const curExp = verifiedDashboardMetrics.currentMonth.expenses;
-    const netProfit = verifiedDashboardMetrics.currentMonth.netProfit;
-    const prevExp = verifiedDashboardMetrics.previousMonth.expenses;
-    const prevNetProfit = verifiedDashboardMetrics.previousMonth.netProfit;
-
-    const netProfitChange = prevNetProfit !== 0 ? ((netProfit - prevNetProfit) / Math.abs(prevNetProfit)) * 100 : (netProfit > 0 ? 100 : 0);
-    const netProfitChangeStr = netProfitChange >= 0 ? `+${netProfitChange.toFixed(0)}%` : `${netProfitChange.toFixed(0)}%`;
-
-    const revChange = prevRev > 0 ? ((curRev - prevRev) / prevRev) * 100 : 0;
-    const revChangeStr = revChange >= 0 ? `+${revChange.toFixed(0)}%` : `${revChange.toFixed(0)}%`;
-
-    const unpaidTotal = verifiedDashboardMetrics.receivables;
-    const cashForecast = verifiedDashboardMetrics.cashForecast;
-
-    // Calculate receivables percentage (against total invoices or a target)
-    const totalInvoices = (filteredInvoices || []).reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-    const receivablesPercentage = totalInvoices > 0 ? Math.min(Math.round((unpaidTotal / totalInvoices) * 100), 100) : 0;
-
-    // Calculate today's collection change compared to yesterday
-    const todayStr = new Date().toISOString().split('T')[0];
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-    
-    const todayCollection = verifiedDashboardMetrics.todayCollection;
-    const yesterdayCollection = (customerPayments || [])
-      .filter((p: any) => new Date(p.date).toISOString().split('T')[0] === yesterdayStr)
-      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-    
-    const collectionChange = yesterdayCollection > 0 
-      ? ((todayCollection - yesterdayCollection) / yesterdayCollection) * 100 
-      : (todayCollection > 0 ? 100 : 0);
-    const collectionChangeStr = collectionChange >= 0 ? `+${collectionChange.toFixed(0)}%` : `${collectionChange.toFixed(0)}%`;
-
-    // Calculate collection percentage against daily target (assuming 30-day month)
-    const monthlyTarget = curRev > 0 ? curRev / 30 : 10000;
-    const collectionPercentage = monthlyTarget > 0 ? Math.min(Math.round((todayCollection / monthlyTarget) * 100), 100) : 0;
-
-    const pendingJobsCount = (filteredWorkOrders || [])
-      .filter((wo: any) => ['Pending', 'Scheduled', 'In Progress', 'QA'].includes(wo.status))
-      .length;
-
-    const activeExamBatches = (examinationQueue || [])
-      .filter((e: any) => ['Calculated', 'Approved'].includes(e.status))
-      .length;
-
-    const totalActiveJobs = pendingJobsCount + activeExamBatches;
-
-    // Calculate active jobs change compared to last week
-    const lastWeek = new Date();
-    lastWeek.setDate(lastWeek.getDate() - 7);
-    const lastWeekJobs = (filteredWorkOrders || [])
-      .filter((wo: any) => {
-        const createdAt = new Date(wo.createdAt || wo.date);
-        return createdAt <= lastWeek && ['Pending', 'Scheduled', 'In Progress', 'QA'].includes(wo.status);
-      }).length;
-    
-    const jobsChange = lastWeekJobs > 0 
-      ? ((totalActiveJobs - lastWeekJobs) / lastWeekJobs) * 100 
-      : (totalActiveJobs > 0 ? 100 : 0);
-    const jobsChangeStr = jobsChange >= 0 ? `+${jobsChange.toFixed(0)}%` : `${jobsChange.toFixed(0)}%`;
-
-    // Calculate active jobs percentage against capacity (assuming 20 jobs capacity)
-    const jobsCapacity = 20;
-    const jobsPercentage = Math.min(Math.round((totalActiveJobs / jobsCapacity) * 100), 100);
-
-    return [
-      {
-        label: 'Receivables',
-        value: `${currency}${formatKPIValue(unpaidTotal)}`,
-        change: revChangeStr,
-        icon: <AlertCircle size={20} className="text-rose-500" />,
-        path: '/sales-flow/invoices',
-        percentage: receivablesPercentage || 0,
-        color: '#f43f5e'
-      },
-      {
-        label: "Today's Collection",
-        value: `${currency}${formatKPIValue(todayCollection)}`,
-        change: collectionChangeStr,
-        icon: <Wallet size={20} className="text-emerald-500" />,
-        path: '/sales-flow/payments',
-        percentage: collectionPercentage || 0,
-        color: '#10b981'
-      },
-      {
-        label: 'Net Profit',
-        value: `${currency}${formatKPIValue(netProfit)}`,
-        change: netProfitChangeStr,
-        icon: <TrendingUp size={20} className="text-purple-500" />,
-        path: '/fiscal-reports/financials?type=IncomeStatement',
-        percentage: Math.min(Math.max(Math.round((curRev > 0 ? (netProfit / curRev) * 100 : 0)), 0), 100),
-        color: '#8b5cf6',
-        period: 'This Month',
-        valueColor: netProfit < 0 ? 'text-rose-600' : 'text-[#1E293B]'
-      },
-      {
-        label: 'Active Jobs',
-        value: (totalActiveJobs || 0).toString().padStart(2, '0'),
-        change: jobsChangeStr,
-        icon: <Timer size={20} className="text-amber-500" />,
-        path: '/industrial/work-orders',
-        percentage: jobsPercentage || 0,
-        color: '#f59e0b'
-      },
-    ];
-  }, [currency, filteredWorkOrders, examinationQueue, verifiedDashboardMetrics, filteredInvoices, customerPayments]);
-
-  const performanceData = useMemo(() => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentYear = new Date().getFullYear();
-    return months.map((month, index) => {
-      const monthIncome = getMonthlyRevenue(index, currentYear);
-      const monthExpense = getMonthlyExpenditure(index, currentYear);
-
-      return { name: month, income: monthIncome, expense: monthExpense, active: index === new Date().getMonth() };
-    });
-  }, [getMonthlyRevenue, getMonthlyExpenditure]);
 
   const timelineEvents = useMemo(() => {
     const nextWeek = new Date();
@@ -474,20 +483,6 @@ const Dashboard: React.FC = () => {
         meta: `Qty: ${w.quantityPlanned}`
       }));
 
-    const activeSubs = (filteredRecurringInvoices || [])
-      .filter((s: any) => s.status === 'Active')
-      .map((s: any) => ({
-        id: s.id,
-        rawType: 'Subscription',
-        time: 'Recurring',
-        title: s.customerName,
-        desc: `Amount: ${currency}${(s.total || s.totalAmount || 0).toLocaleString()}`,
-        dueDate: s.nextRunDate.split('T')[0],
-        icon: <RefreshCw size={16} />,
-        color: '#10b981',
-        meta: `Freq: ${s.frequency}`
-      }));
-
     const activeExams = Object.values(
       (examinationQueue || [])
         .filter((e: any) => e.status !== 'invoiced')
@@ -516,7 +511,7 @@ const Dashboard: React.FC = () => {
       meta: `${e.meta} • ${e.subjectCount} subjects`
     }));
 
-    return [...pendingJobs, ...activeJobs, ...activeTasks, ...activeSubs, ...activeExams]
+    return [...pendingJobs, ...activeJobs, ...activeTasks, ...activeExams]
       .filter(item => {
         const d = new Date(item.dueDate);
         return d >= now && d <= nextWeek;
@@ -560,167 +555,206 @@ const Dashboard: React.FC = () => {
     };
   }, [filteredSales]);
 
-  // Cash flow Calculation (Invoices, POS, Examination)
-  const logisticsData = useMemo(() => {
-    const pending = (deliveryNotes || []).filter((dn: any) => dn.status === 'Pending').length;
-    const active = (shipments || []).filter((s: any) => s.status !== 'Delivered' && s.status !== 'Cancelled').length;
-    return { pending, active };
-  }, [deliveryNotes, shipments]);
-
-  const currentMonthIdx = new Date().getMonth();
-  const currentMonthData = performanceData[currentMonthIdx];
-
-  const cashFlowSummary = useMemo(() => {
+  // Performance Chart Data - Monthly Income vs Expenditure
+  const performanceData = useMemo(() => {
+    const months = 6;
     const now = new Date();
-    let startDate: Date | null = null;
+    const data: { month: string; income: number; expenditure: number }[] = [];
 
-    if (invoiceTimePeriod === 'Last week') startDate = subWeeks(now, 1);
-    else if (invoiceTimePeriod === 'Last month') startDate = subMonths(now, 1);
-    else if (invoiceTimePeriod === 'Last year') startDate = subYears(now, 1);
+    for (let i = months - 1; i >= 0; i--) {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+      const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
 
-    // 1. Invoices (Standard Sales Invoices)
-    const periodInvoices = startDate
-      ? (filteredInvoices || []).filter(i => isAfter(new Date(i.date), startDate!))
-      : (filteredInvoices || []);
-    const invoicesTotal = periodInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+      // Calculate monthly income from sales and customer payments
+      const monthlyIncome = (filteredSales || [])
+        .filter((s: any) => {
+          const d = new Date(s.date || s.createdAt);
+          return d >= monthStart && d <= monthEnd;
+        })
+        .reduce((sum: number, s: any) => sum + (s.total || s.totalAmount || 0), 0)
+        +
+        (customerPayments || [])
+          .filter((p: any) => {
+            const d = new Date(p.date || p.createdAt);
+            return d >= monthStart && d <= monthEnd;
+          })
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-    // 2. POS (Point of Sale Sales)
-    const periodPOS = startDate
-      ? (filteredSales || []).filter(s => isAfter(new Date(s.date), startDate!))
-      : (filteredSales || []);
-    const posTotal = periodPOS.reduce((sum, s) => sum + (s.total || s.totalAmount || 0), 0);
+      // Calculate monthly expenditure from expenses and supplier payments
+      const monthlyExpenditure = (expenses || [])
+        .filter((e: any) => {
+          const d = new Date(e.date || e.createdAt);
+          return d >= monthStart && d <= monthEnd;
+        })
+        .reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
+        +
+        (supplierPayments || [])
+          .filter((sp: any) => {
+            const d = new Date(sp.date || sp.createdAt);
+            return d >= monthStart && d <= monthEnd;
+          })
+          .reduce((sum: number, sp: any) => sum + (sp.amount || 0), 0);
 
-    // 3. Examination (Invoices specifically for Examinations)
-    const periodExams = startDate
-      ? (filteredInvoices || []).filter(i => {
-        const isDateMatch = isAfter(new Date(i.date), startDate!);
-        const isExam = i.type === 'Examination Invoice' ||
-          i.category === 'Examination' ||
-          (i.items || []).some((item: any) => item.category === 'Examination' || (item.name && item.name.toLowerCase().includes('exam')));
-        return isDateMatch && isExam;
-      })
-      : (filteredInvoices || []).filter(i =>
-        i.type === 'Examination Invoice' ||
-        i.category === 'Examination' ||
-        (i.items || []).some((item: any) => item.category === 'Examination' || (item.name && item.name.toLowerCase().includes('exam')))
-      );
-    const examsTotal = periodExams.reduce((sum, ri) => sum + (ri.totalAmount || 0), 0);
-
-    // Adjust Invoices Total to exclude exams and POS to prevent double counting
-    // Note: POS Sales create corresponding Invoice records, so they are included in invoicesTotal.
-    // We subtract posTotal (calculated from Sales) from invoicesTotal to avoid counting them twice in the Grand Total
-    // and to separate them in the breakdown.
-    const adjustedInvoicesTotal = Math.max(0, invoicesTotal - examsTotal - posTotal);
-
-    const grandTotal = adjustedInvoicesTotal + posTotal + examsTotal;
-
-    const data = [
-      { name: 'Invoices', value: adjustedInvoicesTotal, color: '#4F46E5', percentage: grandTotal > 0 ? (adjustedInvoicesTotal / grandTotal) * 100 : 0 },
-      { name: 'POS', value: posTotal, color: '#F59E0B', percentage: grandTotal > 0 ? (posTotal / grandTotal) * 100 : 0 },
-      { name: 'Examination', value: examsTotal, color: '#10B981', percentage: grandTotal > 0 ? (examsTotal / grandTotal) * 100 : 0 }
-    ].filter(d => d.value > 0);
-
-    if (data.length === 0) data.push({ name: 'No Data', value: 1, color: '#f1f5f9', percentage: 100 });
-
-    return { data, total: grandTotal };
-  }, [filteredInvoices, filteredSales, filteredRecurringInvoices, invoiceTimePeriod]);
-
-  // POS Performance Calculation
-  const posPerformanceData = useMemo(() => {
-    const now = new Date();
-    let chartData: { name: string, value: number }[] = [];
-    let startDate: Date;
-    let periodStr: string;
-    let prevStartDate: Date;
-    let prevEndDate: Date;
-
-    if (posTimePeriod === 'Last week') {
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const startOfWeek = new Date(now);
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-      startOfWeek.setDate(diff);
-      startOfWeek.setHours(0, 0, 0, 0);
-      startDate = startOfWeek;
-
-      chartData = days.map((dayName, index) => {
-        const targetDate = new Date(startOfWeek);
-        targetDate.setDate(startOfWeek.getDate() + index);
-        const dateString = targetDate.toISOString().split('T')[0];
-
-        const dailyTotal = (filteredSales || []).filter(sale => {
-          const saleDate = new Date(sale.date).toISOString().split('T')[0];
-          return saleDate === dateString;
-        }).reduce((sum, sale) => sum + (sale.total || sale.totalAmount || 0), 0);
-
-        return { name: dayName, value: dailyTotal };
+      data.push({
+        month: format(targetDate, 'MMM'),
+        income: Math.round(monthlyIncome),
+        expenditure: Math.round(monthlyExpenditure)
       });
-      periodStr = `${format(startOfWeek, 'MMM dd')} - ${format(new Date(startOfWeek.getTime() + 6 * 24 * 60 * 60 * 1000), 'MMM dd, yyyy')}`;
-
-      prevStartDate = subWeeks(startOfWeek, 1);
-      prevEndDate = startOfWeek;
-    } else if (posTimePeriod === 'Last month') {
-      const startOfPeriod = subMonths(now, 1);
-      startDate = startOfPeriod;
-
-      // Group into 4 weeks for the last 30 days
-      chartData = [3, 2, 1, 0].map(weeksAgo => {
-        const wStart = subWeeks(now, weeksAgo + 1);
-        const wEnd = subWeeks(now, weeksAgo);
-
-        const weeklyTotal = (filteredSales || []).filter(sale => {
-          const d = new Date(sale.date);
-          return d >= wStart && d < wEnd;
-        }).reduce((sum, sale) => sum + (sale.total || sale.totalAmount || 0), 0);
-
-        return { name: `W${4 - weeksAgo}`, value: weeklyTotal };
-      });
-      periodStr = `${format(startOfPeriod, 'MMM dd')} - ${format(now, 'MMM dd, yyyy')}`;
-
-      prevStartDate = subMonths(startOfPeriod, 1);
-      prevEndDate = startOfPeriod;
-    } else { // Last year
-      const startOfPeriod = subYears(now, 1);
-      startDate = startOfPeriod;
-
-      // Last 12 months
-      chartData = Array.from({ length: 12 }).map((_, i) => {
-        const d = subMonths(now, 11 - i);
-        const monthName = format(d, 'MMM');
-        const mStart = new Date(d.getFullYear(), d.getMonth(), 1);
-        const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-
-        const monthlyTotal = (filteredSales || []).filter(sale => {
-          const sd = new Date(sale.date);
-          return sd >= mStart && sd <= mEnd;
-        }).reduce((sum, sale) => sum + (sale.total || sale.totalAmount || 0), 0);
-
-        return { name: monthName, value: monthlyTotal };
-      });
-      periodStr = `${format(startOfPeriod, 'MMM yyyy')} - ${format(now, 'MMM yyyy')}`;
-
-      prevStartDate = subYears(startOfPeriod, 1);
-      prevEndDate = startOfPeriod;
     }
 
-    const currentTotal = chartData.reduce((sum, d) => sum + d.value, 0);
+    return data;
+  }, [filteredSales, customerPayments, expenses, supplierPayments]);
 
-    const prevTotal = (filteredSales || []).filter(sale => {
-      const d = new Date(sale.date);
-      return d >= prevStartDate && d < prevEndDate;
-    }).reduce((sum, sale) => sum + (sale.total || sale.totalAmount || 0), 0);
+  // Cash Flow Breakdown - Invoices, POS, Examination
+  const cashFlowData = useMemo(() => {
+    // Invoices total from filtered invoices
+    const invoicesTotal = (filteredInvoices || []).reduce((sum: number, inv: any) => sum + (inv.totalAmount || 0), 0);
 
-    const change = prevTotal > 0
-      ? Math.round(((currentTotal - prevTotal) / prevTotal) * 100)
-      : currentTotal > 0 ? 100 : 0;
+    // POS total from sales (assuming sales are POS transactions)
+    const posTotal = (filteredSales || []).reduce((sum: number, sale: any) => sum + (sale.total || sale.totalAmount || 0), 0);
+
+    // Examination total from examination queue (if available)
+    const examinationTotal = (examinationQueue || []).reduce((sum: number, exam: any) => {
+      // Assuming examination has an amount or total field
+      return sum + (exam.total_amount || exam.amount || 0);
+    }, 0);
+
+    const grandTotal = invoicesTotal + posTotal + examinationTotal;
+
+    // Calculate percentages
+    const invoicesPercent = grandTotal > 0 ? Math.round((invoicesTotal / grandTotal) * 100) : 0;
+    const posPercent = grandTotal > 0 ? Math.round((posTotal / grandTotal) * 100) : 0;
+    const examinationPercent = grandTotal > 0 ? Math.round((examinationTotal / grandTotal) * 100) : 0;
 
     return {
-      data: chartData,
-      total: currentTotal,
-      change,
-      period: periodStr
+      invoices: { amount: invoicesTotal, percent: invoicesPercent },
+      pos: { amount: posTotal, percent: posPercent },
+      examination: { amount: examinationTotal, percent: examinationPercent },
+      grandTotal
     };
-  }, [filteredSales, posTimePeriod]);
+  }, [filteredInvoices, filteredSales, examinationQueue]);
+
+  // POS Performance Data - monthly POS sales for area chart
+  const posPerformanceData = useMemo(() => {
+    const now = new Date();
+    const months = 6;
+    const data: Array<{ month: string; sales: number }> = [];
+
+    for (let i = months - 1; i >= 0; i--) {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+      const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
+
+      const monthlySales = (filteredSales || [])
+        .filter((s: any) => {
+          const d = new Date(s.date || s.createdAt);
+          return d >= monthStart && d <= monthEnd;
+        })
+        .reduce((sum: number, s: any) => sum + (s.total || s.totalAmount || 0), 0);
+
+      data.push({
+        month: format(targetDate, 'MMM'),
+        sales: Math.round(monthlySales)
+      });
+    }
+
+    const totalSales = data.reduce((sum, d) => sum + d.sales, 0);
+    const half = Math.floor(data.length / 2);
+    const firstHalf = data.slice(0, half).reduce((s, d) => s + d.sales, 0);
+    const secondHalf = data.slice(half).reduce((s, d) => s + d.sales, 0);
+    const change = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf) * 100 : (secondHalf > 0 ? 100 : 0);
+
+    return { data, totalSales, change };
+  }, [filteredSales]);
+
+  const kpiData = useMemo(() => {
+    const curRev = verifiedDashboardMetrics.currentMonth.revenue;
+    const prevRev = verifiedDashboardMetrics.previousMonth.revenue;
+    const netProfit = verifiedDashboardMetrics.currentMonth.netProfit;
+    const prevNetProfit = verifiedDashboardMetrics.previousMonth.netProfit;
+
+    const netProfitChange = prevNetProfit !== 0 ? ((netProfit - prevNetProfit) / Math.abs(prevNetProfit)) * 100 : (netProfit > 0 ? 100 : 0);
+    const netProfitChangeStr = netProfitChange >= 0 ? `+${netProfitChange.toFixed(0)}%` : `${netProfitChange.toFixed(0)}%`;
+
+    const revChange = prevRev > 0 ? ((curRev - prevRev) / prevRev) * 100 : 0;
+    const revChangeStr = revChange >= 0 ? `+${revChange.toFixed(0)}%` : `${revChange.toFixed(0)}%`;
+
+    const unpaidTotal = verifiedDashboardMetrics.receivables;
+    const todayCollection = verifiedDashboardMetrics.todayCollection;
+    const yesterdayCollection = verifiedDashboardMetrics.yesterdayCollection || 0;
+
+    const totalInvoices = (filteredInvoices || []).reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+    const receivablesPercentage = totalInvoices > 0 ? Math.min(Math.round((unpaidTotal / totalInvoices) * 100), 100) : 0;
+
+    // Dynamic monthly target based on current revenue trends
+    const monthlyTarget = curRev > 0 ? curRev / 30 : 
+      ((filteredSales || []).reduce((sum, s) => sum + (s.total || s.totalAmount || 0), 0) / 30) || 10000;
+    const collectionPercentage = monthlyTarget > 0 ? Math.min(Math.round((todayCollection / monthlyTarget) * 100), 100) : 0;
+    
+    // Calculate today's collection change
+    const todayCollectionChange = yesterdayCollection > 0 ? ((todayCollection - yesterdayCollection) / yesterdayCollection) * 100 : 0;
+    const todayCollectionChangeStr = todayCollectionChange >= 0 ? `+${todayCollectionChange.toFixed(0)}%` : `${todayCollectionChange.toFixed(0)}%`;
+
+    const totalActiveJobs = (filteredWorkOrders || [])
+      .filter((wo: any) => ['Pending', 'Scheduled', 'In Progress', 'QA'].includes(wo.status))
+      .length + (examinationQueue || []).filter((e: any) => ['Calculated', 'Approved'].includes(e.status)).length;
+
+    // Calculate previous active jobs for change comparison (based on completed jobs trend)
+    const completedJobsThisMonth = (filteredWorkOrders || [])
+      .filter((wo: any) => wo.status === 'Completed' && new Date(wo.updatedAt || wo.createdAt) > new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+      .length;
+    const previousActiveJobs = Math.max(1, totalActiveJobs - completedJobsThisMonth);
+    const activeJobsChange = previousActiveJobs > 0 ? ((totalActiveJobs - previousActiveJobs) / previousActiveJobs) * 100 : 0;
+    const activeJobsChangeStr = activeJobsChange >= 0 ? `+${activeJobsChange.toFixed(0)}%` : `${activeJobsChange.toFixed(0)}%`;
+
+    // Dynamic jobs capacity based on historical data or company size
+    const avgMonthlyJobs = (filteredWorkOrders || []).length > 0 ? 
+      Math.ceil((filteredWorkOrders || []).length / 3) : 20; // Average over 3 months, default to 20
+    const jobsCapacity = Math.max(20, avgMonthlyJobs); // Minimum capacity of 20
+    const jobsPercentage = Math.min(Math.round((totalActiveJobs / jobsCapacity) * 100), 100);
+
+    return [
+      { 
+        label: 'Receivables', 
+        value: `${currency}${formatKPIValue(unpaidTotal)}`, 
+        change: revChangeStr, 
+        icon: <AlertCircle size={20} className="text-rose-500" />, 
+        path: '/sales-flow/invoices', 
+        percentage: receivablesPercentage || 0, 
+        color: '#f43f5e' 
+      },
+      { 
+        label: "Today's Collection", 
+        value: `${currency}${formatKPIValue(todayCollection)}`, 
+        change: todayCollectionChangeStr, 
+        icon: <Wallet size={20} className="text-emerald-500" />, 
+        path: '/sales-flow/payments', 
+        percentage: collectionPercentage || 0, 
+        color: '#10b981' 
+      },
+      { 
+        label: 'Net Profit', 
+        value: `${currency}${formatKPIValue(netProfit)}`, 
+        change: netProfitChangeStr, 
+        icon: <TrendingUp size={20} className="text-purple-500" />, 
+        path: '/fiscal-reports/financials?type=IncomeStatement', 
+        percentage: Math.min(Math.max(Math.round((curRev > 0 ? (netProfit / curRev) * 100 : 0)), 0), 100), 
+        color: '#8b5cf6', 
+        period: 'This Month', 
+        valueColor: netProfit < 0 ? 'text-rose-600' : 'text-[#1E293B]' 
+      },
+      { 
+        label: 'Active Jobs', 
+        value: (totalActiveJobs || 0).toString().padStart(2, '0'), 
+        change: activeJobsChangeStr, 
+        icon: <Timer size={20} className="text-amber-500" />, 
+        path: '/industrial/work-orders', 
+        percentage: jobsPercentage || 0, 
+        color: '#f59e0b' 
+      },
+    ];
+  }, [currency, filteredWorkOrders, examinationQueue, verifiedDashboardMetrics, filteredInvoices]);
 
   const handleCompleteItem = (item: any) => {
     setCompletingId(item.id);
@@ -965,472 +999,345 @@ const Dashboard: React.FC = () => {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 min-[1025px]:grid-cols-4 gap-6 mb-10 shrink-0">
-          {/* Financial Performance - 75% */}
-          <div className="min-[1025px]:col-span-3 bg-white p-8 rounded-[2rem] shadow-soft border border-white/40">
-            <div className="flex justify-between items-center mb-10">
-              <div>
-                <h3 className="text-lg font-bold text-[#0f172a] tracking-tight">Financial Performance</h3>
-                <p className="text-[10px] text-slate-400 font-bold tracking-[0.1em] mt-1.5 uppercase">Income vs Expenditure</p>
-              </div>
-              <div className="flex items-center gap-8 bg-slate-50/50 p-2 rounded-2xl border border-slate-100/50">
-                <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl transition-all hover:bg-white hover:shadow-sm group cursor-pointer">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)] group-hover:scale-110 transition-transform"></div>
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Income</span>
-                </div>
-                <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl transition-all hover:bg-white hover:shadow-sm group cursor-pointer">
-                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.5)] group-hover:scale-110 transition-transform"></div>
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Expenditure</span>
-                </div>
-              </div>
+        {/* Performance Chart Section - 75% width */}
+        <div className="flex gap-6">
+          <div className="w-3/4 bg-white rounded-[1.5rem] shadow-soft border border-white p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-base font-bold text-[#1E293B]">Performance Overview</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Income vs Expenditure • Last 6 months</p>
             </div>
-            
-            <div className="h-[420px] relative mt-4 bg-[#0f172a] rounded-[1.5rem] p-8 overflow-hidden shadow-2xl">
-              {/* Decorative Background Elements to mimic neon feel */}
-              <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-emerald-500 rounded-full blur-[120px]"></div>
-                <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-rose-500 rounded-full blur-[120px]"></div>
-              </div>
-
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={performanceData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="incomeGlow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="expenseGlow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
-                    </linearGradient>
-                    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feGaussianBlur stdDeviation="4" result="blur" />
-                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                    </filter>
-                  </defs>
-                  
-                  <CartesianGrid 
-                    vertical={false} 
-                    strokeDasharray="0" 
-                    stroke="rgba(255,255,255,0.05)" 
-                  />
-                  
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={(props) => {
-                      const { x, y, payload } = props;
-                      const isActiveMonth = payload.value === format(new Date(), 'MMM');
-                      return (
-                        <g transform={`translate(${x},${y})`}>
-                          <text 
-                            x={0} 
-                            y={0} 
-                            dy={20} 
-                            textAnchor="middle" 
-                            fill={isActiveMonth ? "#fff" : "rgba(255,255,255,0.3)"}
-                            className={`text-[11px] font-bold tracking-tight ${isActiveMonth ? 'opacity-100' : 'opacity-60'}`}
-                          >
-                            {payload.value}
-                          </text>
-                          {isActiveMonth && (
-                            <rect x={-15} y={28} width={30} height={2} fill="#10B981" rx={1} />
-                          )}
-                        </g>
-                      );
-                    }}
-                    interval={0}
-                  />
-                  
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 700 }}
-                    tickFormatter={(value) => `${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`}
-                  />
-                  
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-[#1e293b]/95 backdrop-blur-md border border-white/10 p-4 rounded-2xl shadow-2xl min-w-[160px] animate-in zoom-in-95 duration-200">
-                            <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-3">{label} Performance</p>
-                            <div className="space-y-2.5">
-                              <div className="flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                                  <span className="text-xs font-bold text-white/90">Income</span>
-                                </div>
-                                <span className="text-xs font-black text-emerald-400 tabular-nums">{currency}{payload[0].value?.toLocaleString()}</span>
-                              </div>
-                              <div className="flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></div>
-                                  <span className="text-xs font-bold text-white/90">Expenditure</span>
-                                </div>
-                                <span className="text-xs font-black text-rose-400 tabular-nums">{currency}{payload[1].value?.toLocaleString()}</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-
-                  <Area
-                    type="monotone"
-                    dataKey="income"
-                    stroke="#10B981"
-                    strokeWidth={4}
-                    fill="url(#incomeGlow)"
-                    animationDuration={2000}
-                    filter="url(#neonGlow)"
-                    activeDot={{ r: 6, fill: '#10B981', stroke: '#fff', strokeWidth: 2, shadow: '0 0 15px rgba(16,185,129,0.8)' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="expense"
-                    stroke="#F43F5E"
-                    strokeWidth={4}
-                    fill="url(#expenseGlow)"
-                    animationDuration={2000}
-                    filter="url(#neonGlow)"
-                    activeDot={{ r: 6, fill: '#F43F5E', stroke: '#fff', strokeWidth: 2, shadow: '0 0 15px rgba(244,63,94,0.8)' }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Recurring Invoices Card - 25% */}
-          <div className="min-[1025px]:col-span-1 bg-white p-6 rounded-[1.75rem] shadow-soft border border-white flex flex-col">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md">
-                  <RefreshCw size={16} className="text-white" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-[#1E293B]">Subscriptions</h3>
-                  <p className="text-[10px] text-slate-400">Recurring invoices</p>
-                </div>
-              </div>
-              {filteredRecurringInvoices.length > 1 && (
-                <div className="flex items-center gap-1">
-                  {filteredRecurringInvoices.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setActiveSubscriptionIndex(i)}
-                      className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${i === activeSubscriptionIndex ? 'bg-violet-500 w-3' : 'bg-slate-200'}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {filteredRecurringInvoices.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center py-8">
-                <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mb-3">
-                  <RefreshCw size={24} className="text-slate-300" />
-                </div>
-                <p className="text-xs font-semibold text-slate-400">No active subscriptions</p>
-                <p className="text-[10px] text-slate-300 mt-1">Recurring invoices will appear here</p>
-              </div>
-            ) : (
-              <div className="flex-1 overflow-hidden relative">
-                <div
-                  className="transition-transform duration-1000 ease-in-out h-full"
-                  style={{ transform: `translateX(-${activeSubscriptionIndex * 100}%)` }}
-                >
-                  {filteredRecurringInvoices.map((sub: any, idx: number) => (
-                    <div
-                      key={sub.id || idx}
-                      className="h-full flex flex-col"
-                      style={{ minHeight: idx === 0 ? '100%' : 0 }}
-                    >
-                      {/* Premium Badge */}
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-100 to-amber-50 text-amber-700 text-[9px] font-bold uppercase tracking-wider border border-amber-200/50">
-                          Premium
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                          sub.status === 'Active'
-                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                            : 'bg-slate-50 text-slate-500 border border-slate-100'
-                        }`}>
-                          {sub.status || 'Active'}
-                        </span>
-                      </div>
-
-                      {/* Customer Info */}
-                      <div className="mb-4">
-                        <p className="text-base font-bold text-[#1E293B] truncate">{sub.customerName || 'Unknown Customer'}</p>
-                        {sub.customerEmail && (
-                          <p className="text-[11px] text-slate-400 truncate mt-0.5">{sub.customerEmail}</p>
-                        )}
-                      </div>
-
-                      {/* Details Grid */}
-                      <div className="space-y-3 flex-1">
-                        <div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl">
-                          <div className="flex items-center gap-2">
-                            <Calendar size={14} className="text-violet-500" />
-                            <span className="text-[11px] text-slate-500 font-medium">Frequency</span>
-                          </div>
-                          <span className="text-[11px] font-bold text-[#1E293B]">{sub.frequency || 'Monthly'}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl">
-                          <div className="flex items-center gap-2">
-                            <Clock size={14} className="text-blue-500" />
-                            <span className="text-[11px] text-slate-500 font-medium">Next Invoice</span>
-                          </div>
-                          <span className="text-[11px] font-bold text-[#1E293B]">
-                            {sub.nextRunDate ? format(new Date(sub.nextRunDate), 'MMM dd, yyyy') : 'N/A'}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl">
-                          <div className="flex items-center gap-2">
-                            <DollarSign size={14} className="text-emerald-500" />
-                            <span className="text-[11px] text-slate-500 font-medium">Amount</span>
-                          </div>
-                          <span className="text-[11px] font-bold text-[#1E293B]">{currency}{(sub.total || sub.totalAmount || 0).toLocaleString()}</span>
-                        </div>
-
-                        {sub.description && (
-                          <div className="p-3 bg-violet-50/50 rounded-xl border border-violet-100/50">
-                            <p className="text-[10px] text-slate-400 font-medium mb-1">Description</p>
-                            <p className="text-[11px] text-slate-600 line-clamp-2">{sub.description}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* View Full Details */}
-                      <button
-                        onClick={() => navigate('/sales-flow/recurring-invoices', { state: { id: sub.id } })}
-                        className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white text-[11px] font-bold hover:shadow-lg hover:shadow-violet-500/25 transition-all flex items-center justify-center gap-2"
-                      >
-                        <Eye size={14} />
-                        View Full Details
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Auto-slide indicator */}
-            {filteredRecurringInvoices.length > 1 && (
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-[10px] text-slate-400 font-medium">
-                  {activeSubscriptionIndex + 1} of {filteredRecurringInvoices.length}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setActiveSubscriptionIndex(prev => prev === 0 ? filteredRecurringInvoices.length - 1 : prev - 1)}
-                    className="w-6 h-6 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-center transition-colors text-slate-400"
-                  >
-                    <ChevronRight size={12} className="rotate-180" />
-                  </button>
-                  <button
-                    onClick={() => setActiveSubscriptionIndex(prev => (prev + 1) % filteredRecurringInvoices.length)}
-                    className="w-6 h-6 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-center transition-colors text-slate-400"
-                  >
-                    <ChevronRight size={12} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 min-[1025px]:grid-cols-2 gap-8 mb-10 shrink-0">
-          {/* Redesigned Cash flow Card - Mimicking Conversion Rate Style */}
-          <div className="bg-white p-8 rounded-[2rem] shadow-soft border border-white/40">
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex items-center gap-5">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center">
-                  <Activity size={16} className="text-slate-900" />
-                </div>
-                <h3 className="text-[15px] font-bold text-slate-900 tracking-tight">Cash flow</h3>
+                <span className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span>
+                <span className="text-[11px] font-semibold text-slate-500">Income</span>
               </div>
-              <button 
-                onClick={() => navigate('/revenue/intel')}
-                className="text-[13px] font-bold text-[#8b5cf6] hover:text-[#7c3aed] transition-colors"
-              >
-                See More
-              </button>
-            </div>
-
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
-              {/* Left: Donut Chart */}
-              <div className="relative w-48 h-48 flex-shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={cashFlowSummary.data}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={65}
-                      outerRadius={85}
-                      paddingAngle={4}
-                      dataKey="value"
-                      stroke="none"
-                      cornerRadius={10}
-                      startAngle={90}
-                      endAngle={450}
-                    >
-                      {cashFlowSummary.data.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                {/* Center Content */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-3xl font-black text-slate-900 tracking-tighter">100%</span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Breakdown</span>
-                </div>
-              </div>
-
-              {/* Right: Detailed List */}
-              <div className="flex-1 w-full space-y-5">
-                {cashFlowSummary.data.map((item, idx) => (
-                  <div key={idx} className="group">
-                    <div className="flex items-center justify-between py-1">
-                      <div className="flex items-start gap-4">
-                        {/* Bullet */}
-                        <div className="mt-1.5 w-3 h-1.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                        
-                        <div>
-                          <p className="text-[14px] font-bold text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors">
-                            {item.name}
-                          </p>
-                          <p className="text-[11px] font-bold text-slate-400 mt-0.5 tracking-tight uppercase">
-                            {currency}{formatKPIValue(item.value)} Volume
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="text-right">
-                        <span className="text-lg font-black text-slate-900 tabular-nums">
-                          {Math.round(item.percentage)}%
-                        </span>
-                      </div>
-                    </div>
-                    {/* Divider */}
-                    {idx < cashFlowSummary.data.length - 1 && (
-                      <div className="mt-4 border-b border-slate-100/80" />
-                    )}
-                  </div>
-                ))}
-                
-                {/* Total Summary Footer */}
-                <div className="pt-4 mt-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Grand Total</span>
-                  <span className="text-lg font-black text-indigo-600">{currency}{formatKPIValue(cashFlowSummary.total)}</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-gradient-to-r from-rose-400 to-red-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]"></span>
+                <span className="text-[11px] font-semibold text-slate-500">Expenditure</span>
               </div>
             </div>
           </div>
-
-          {/* Redesigned POS performance Card - Mimicking "Deals" Style */}
-          <div className="bg-white p-8 rounded-[2rem] shadow-soft border border-white/40 flex flex-col h-full">
-            <div className="flex justify-between items-start mb-6">
-              <h3 className="text-2xl font-black text-slate-800 tracking-tight">Deals</h3>
-              <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-indigo-300 transition-all cursor-pointer group">
-                <select
-                  value={posTimePeriod || 'Last week'}
-                  onChange={(e) => setPosTimePeriod(e.target.value)}
-                  className="bg-transparent border-none text-[13px] font-bold text-slate-600 outline-none cursor-pointer appearance-none pr-2"
-                >
-                  <option value="Last week">Jan - Dec 2026</option>
-                  <option value="Last month">This Month</option>
-                  <option value="Last year">Full Year</option>
-                </select>
-                <Calendar size={16} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
-              </div>
-            </div>
-
-            <div className="mb-8">
-              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Total:</p>
-              <div className="flex items-baseline gap-4">
-                <span className="text-3xl font-black text-slate-900 tabular-nums tracking-tighter">
-                  {currency}{formatKPIValue(posPerformanceData.total)}
-                </span>
-                <span className={`text-[13px] font-black px-2 py-0.5 rounded-full ${posPerformanceData.change >= 0 ? 'text-emerald-500 bg-emerald-50/50' : 'text-rose-500 bg-rose-50/50'}`}>
-                  {posPerformanceData.change >= 0 ? '+' : ''}{posPerformanceData.change}%
-                </span>
-              </div>
-            </div>
-
-            <div className="flex-1 min-h-[220px] w-full mt-auto">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={posPerformanceData.data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="dealsGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="0" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }}
-                    dy={15}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }}
-                    tickFormatter={(value) => `${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`}
-                  />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="relative">
-                            <div className="bg-[#4f46e5] px-4 py-2 rounded-xl shadow-xl border border-white/20 animate-in zoom-in-95 duration-200">
-                              <p className="text-white text-[13px] font-black tabular-nums">
-                                {currency}{payload[0].value?.toLocaleString()}
-                              </p>
-                            </div>
-                            {/* Tooltip arrow/pointer */}
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#4f46e5] rotate-45" />
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                    cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    offset={-40}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#4f46e5"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#dealsGradient)"
-                    activeDot={{ r: 7, fill: '#4f46e5', stroke: '#fff', strokeWidth: 3, shadow: '0 0 10px rgba(79,70,229,0.5)' }}
-                    animationDuration={1500}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={performanceData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                <defs>
+                  {/* Income Gradient - Emerald to Cyan */}
+                  <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
+                    <stop offset="50%" stopColor="#06b6d4" stopOpacity={0.15} />
+                    <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.02} />
+                  </linearGradient>
+                  {/* Expenditure Gradient - Rose to Red */}
+                  <linearGradient id="expenditureGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.3} />
+                    <stop offset="50%" stopColor="#fb7185" stopOpacity={0.12} />
+                    <stop offset="100%" stopColor="#fb7185" stopOpacity={0.02} />
+                  </linearGradient>
+                  {/* Glow filters */}
+                  <filter id="incomeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feFlood floodColor="#10b981" floodOpacity="0.4" result="color" />
+                    <feComposite in="color" in2="blur" operator="in" result="glow" />
+                    <feMerge>
+                      <feMergeNode in="glow" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                  <filter id="expenditureGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feFlood floodColor="#f43f5e" floodOpacity="0.4" result="color" />
+                    <feComposite in="color" in2="blur" operator="in" result="glow" />
+                    <feMerge>
+                      <feMergeNode in="glow" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
+                  dy={8}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                  tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}K` : val}
+                  width={55}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
+                    padding: '12px 16px'
+                  }}
+                  labelStyle={{ fontWeight: 700, color: '#1e293b', marginBottom: 6, fontSize: 13 }}
+                  itemStyle={{ fontSize: 12, fontWeight: 600, padding: '2px 0' }}
+                  formatter={(value: number, name: string) => [
+                    `${currency}${value.toLocaleString()}`,
+                    name === 'income' ? 'Income' : 'Expenditure'
+                  ]}
+                  labelFormatter={(label) => `${label} Overview`}
+                />
+                {/* Income Area - Emerald/Cyan glow */}
+                <Area
+                  type="monotone"
+                  dataKey="income"
+                  stroke="#10b981"
+                  strokeWidth={2.5}
+                  fill="url(#incomeGradient)"
+                  filter="url(#incomeGlow)"
+                  dot={false}
+                  activeDot={{
+                    r: 6,
+                    fill: '#10b981',
+                    stroke: '#fff',
+                    strokeWidth: 3,
+                    filter: 'url(#incomeGlow)'
+                  }}
+                  animationDuration={1200}
+                  animationEasing="ease-out"
+                />
+                {/* Expenditure Area - Rose/Red glow */}
+                <Area
+                  type="monotone"
+                  dataKey="expenditure"
+                  stroke="#f43f5e"
+                  strokeWidth={2.5}
+                  fill="url(#expenditureGradient)"
+                  filter="url(#expenditureGlow)"
+                  dot={false}
+                  activeDot={{
+                    r: 6,
+                    fill: '#f43f5e',
+                    stroke: '#fff',
+                    strokeWidth: 3,
+                    filter: 'url(#expenditureGlow)'
+                  }}
+                  animationDuration={1200}
+                  animationEasing="ease-out"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
+          {/* Recurring Invoices Card - 25% width */}
+          <div className="w-1/4">
+            <RecurringInvoicesCard recurringInvoices={filteredRecurringInvoices} currency={currency} navigate={navigate} />
+          </div>
+        </div>
 
+{/* Two-column layout: Cash Flow + POS Performance */}
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+  {/* Cash Flow Breakdown - Invoices, POS, Examination */}
+  <div className="bg-white rounded-[1.5rem] shadow-soft border border-white p-6">
+    <div className="flex items-center justify-between mb-6">
+      <div>
+        <h3 className="text-base font-bold text-[#1E293B]">Cash Flow Breakdown</h3>
+        <p className="text-xs text-slate-400 mt-0.5">Revenue sources • Current period</p>
+      </div>
+      <button
+        onClick={() => navigate('/fiscal-reports/financials?type=RevenueIntelligence')}
+        className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-1"
+      >
+        See More <ChevronRight size={14} />
+      </button>
+    </div>
+    <div className="flex items-center gap-8">
+      {/* Donut Chart - Left */}
+      <div className="relative w-[180px] h-[180px] flex-shrink-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={[
+                { name: 'Invoices', value: cashFlowData.invoices.amount, color: '#3b82f6' },
+                { name: 'POS', value: cashFlowData.pos.amount, color: '#10b981' },
+                { name: 'Examination', value: cashFlowData.examination.amount, color: '#8b5cf6' },
+              ]}
+              cx="50%"
+              cy="50%"
+              innerRadius={58}
+              outerRadius={80}
+              paddingAngle={3}
+              dataKey="value"
+              strokeWidth={0}
+              animationDuration={1000}
+              animationEasing="ease-out"
+            >
+              <Cell fill="#3b82f6" />
+              <Cell fill="#10b981" />
+              <Cell fill="#8b5cf6" />
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        {/* Center label */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="text-[11px] font-medium text-slate-400">Total</span>
+          <span className="text-lg font-bold text-[#1E293B]">100%</span>
+        </div>
+      </div>
 
+      {/* Detailed List - Right */}
+      <div className="flex-1">
+        {/* Invoices */}
+        <div className="flex items-center justify-between py-3.5">
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.5)]"></span>
+            <div>
+              <p className="text-[13px] font-semibold text-[#1E293B]">Invoices</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                <span className="font-semibold text-slate-500">{currency}{cashFlowData.invoices.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> Volume
+              </p>
+            </div>
+          </div>
+          <span className="text-base font-bold text-[#1E293B]">{cashFlowData.invoices.percent}%</span>
+        </div>
+        <div className="border-t border-slate-100"></div>
 
+        {/* POS */}
+        <div className="flex items-center justify-between py-3.5">
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"></span>
+            <div>
+              <p className="text-[13px] font-semibold text-[#1E293B]">POS</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                <span className="font-semibold text-slate-500">{currency}{cashFlowData.pos.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> Volume
+              </p>
+            </div>
+          </div>
+          <span className="text-base font-bold text-[#1E293B]">{cashFlowData.pos.percent}%</span>
+        </div>
+        <div className="border-t border-slate-100"></div>
+
+        {/* Examination */}
+        <div className="flex items-center justify-between py-3.5">
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-purple-500 shadow-[0_0_6px_rgba(139,92,246,0.5)]"></span>
+            <div>
+              <p className="text-[13px] font-semibold text-[#1E293B]">Examination</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                <span className="font-semibold text-slate-500">{currency}{cashFlowData.examination.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> Volume
+              </p>
+            </div>
+          </div>
+          <span className="text-base font-bold text-[#1E293B]">{cashFlowData.examination.percent}%</span>
+        </div>
+        <div className="border-t border-slate-100"></div>
+
+        {/* Grand Total Footer */}
+        <div className="flex items-center justify-between pt-4 mt-1">
+          <p className="text-[13px] font-bold text-slate-500">Grand Total</p>
+          <span className="text-lg font-bold text-[#1E293B]">
+            {currency}{cashFlowData.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        </div>
       </div>
     </div>
-  );
+  </div>
+
+  {/* POS Performance Chart */}
+  <div className="bg-white rounded-[1.5rem] shadow-soft border border-white p-6">
+    <div className="flex items-center justify-between mb-6">
+      <div>
+        <h3 className="text-base font-bold text-[#1E293B]">Sales</h3>
+        <p className="text-xs text-slate-400 mt-0.5">POS performance • Last 6 months</p>
+      </div>
+      <button className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-[11px] font-medium text-slate-600 transition-colors">
+        <Calendar size={13} />
+        <span>Last 6 months</span>
+        <ChevronRight size={12} className="rotate-90" />
+      </button>
+    </div>
+
+    {/* Metrics */}
+    <div className="mb-4">
+      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total:</p>
+      <div className="flex items-baseline gap-3 mt-1">
+        <span className="text-3xl font-extrabold text-[#1E293B]">
+          {currency}{posPerformanceData.totalSales.toLocaleString()}
+        </span>
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+          posPerformanceData.change >= 0
+            ? 'bg-emerald-50 text-emerald-600'
+            : 'bg-red-50 text-red-600'
+        }`}
+        >
+          {posPerformanceData.change >= 0 ? '+' : ''}{posPerformanceData.change.toFixed(1)}%
+        </span>
+      </div>
+    </div>
+
+    {/* Area Chart */}
+    <div className="h-[220px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={posPerformanceData.data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <defs>
+            <linearGradient id="posGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.25} />
+              <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+          <XAxis
+            dataKey="month"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }}
+            dy={8}
+          />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }}
+            tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
+          />
+          <Tooltip
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              return (
+                <div className="relative">
+                  <div className="bg-[#4f46e5] text-white rounded-xl px-4 py-2.5 shadow-lg shadow-indigo-500/30">
+                    <p className="text-[10px] font-medium text-indigo-200 mb-0.5">{label}</p>
+                    <p className="text-sm font-bold">{currency}{payload[0].value?.toLocaleString()}</p>
+                  </div>
+                  <div className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3 bg-[#4f46e5] rotate-45"></div>
+                </div>
+              );
+            }}
+            cursor={{ stroke: '#4f46e5', strokeWidth: 1, strokeDasharray: '4 4' }}
+          />
+          <Area
+            type="monotone"
+            dataKey="sales"
+            stroke="#4f46e5"
+            strokeWidth={2.5}
+            fill="url(#posGradient)"
+            dot={false}
+            activeDot={{
+              r: 6,
+              fill: '#4f46e5',
+              stroke: '#fff',
+              strokeWidth: 3
+            }}
+            animationDuration={1200}
+            animationEasing="ease-out"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+</div>
+</div>
+  </div>
+);
 };
 
 // Calculator button component

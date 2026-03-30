@@ -105,7 +105,7 @@ export const PrimeDocument = ({ type, data }: DocProps) => {
   const companyContact = `${formattedPhone} | ${config?.email || ''}`;
   const companyEnquiryLine = [companyName, companyAddress].filter(Boolean).join(', ');
   const legalFooterLine1 = 'This is a computer-generated document. All accounts are subject to our terms of service';
-  const legalFooterLine2 = `For enquiries contact: ${companyEnquiryLine} Phone: ${companyPhone} Email: ${companyEmail}`;
+  const legalFooterLine2 = `For enquiries contact: ${companyEnquiryLine} Phone: ${companyPhone}`;
   const currency = config?.currencySymbol || 'K';
   const logo = config?.logoBase64 || COMPANY_LOGO_BASE64;
 
@@ -1275,7 +1275,7 @@ if (type === 'POS_RECEIPT') {
         {/* STATIC LEGAL FOOTER (Fixed at the bottom of every page) */}
         <View style={s.legalBottom} fixed>
           <Text style={{ fontSize: 9.5 }}>{legalFooterLine1}</Text>
-          <Text style={{ fontSize: 9.5 }}>{legalFooterLine2}</Text>
+          <Text style={{ fontSize: 9.5, marginTop: 1.125 }}>{legalFooterLine2}</Text>
         </View>
       </Page>
     </Document>
